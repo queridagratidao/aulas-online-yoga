@@ -1,13 +1,6 @@
-/**
- * Apps Script para o formulario "Aula Experimental" do site.
- * Cria o evento na agenda do Google (com convite por e-mail para a aluna),
- * e envia e-mail de confirmacao para a aluna e para a Amanda.
- *
- * Instrucoes de instalacao estao no arquivo INSTRUCOES-AGENDAMENTO.md
- */
-
 var MEET_LINK = "http://meet.google.com/rcf-dbkf-bqz";
-var EMAIL_AMANDA = "querida.gratidao@gmail.com"; // troque pelo e-mail correto se for diferente
+var EMAIL_AMANDA = "queridagratidao@gmail.com";
+var PLANILHA_ID = "1wrPHjjffqze39XmZ2x2HDfGhRRn_q_jvxThu7DmwEAE";
 
 function doPost(e) {
   var params = e.parameter;
@@ -32,6 +25,8 @@ function doPost(e) {
 
   var dataFormatada = Utilities.formatDate(inicio, "GMT-03:00", "dd/MM/yyyy 'às' HH'h'mm");
 
+  registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada);
+
   MailApp.sendEmail({
     to: email,
     subject: "Sua aula experimental de yoga está confirmada! 🌿",
@@ -52,10 +47,27 @@ function doPost(e) {
       "E-mail: " + email + "\n" +
       "WhatsApp: " + whatsapp + "\n" +
       "Data/horário: " + dataFormatada + "\n\n" +
-      "O evento já foi criado na sua agenda do Google."
+      "O evento já foi criado na sua agenda do Google e o lead já está na planilha."
   });
 
   return ContentService
     .createTextOutput(JSON.stringify({ status: "ok" }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada) {
+  var planilha = SpreadsheetApp.openById(PLANILHA_ID);
+  var aba = planilha.getSheets()[0];
+
+  if (aba.getLastRow() === 0) {
+    aba.appendRow(["Data do preenchimento", "Nome", "E-mail", "WhatsApp", "Aula agendada para"]);
+  }
+
+  aba.appendRow([
+    Utilities.formatDate(new Date(), "GMT-03:00", "dd/MM/yyyy HH:mm"),
+    nome,
+    email,
+    whatsapp,
+    dataFormatada
+  ]);
 }

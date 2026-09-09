@@ -33,3 +33,15 @@ Assim você já fica sabendo, já tem na agenda pra lembrar de entrar em contato
 ## Observação sobre o site (o próximo horário mostrado)
 
 O formulário sempre sugere automaticamente a próxima terça ou quinta às 21h, calculada com base na data em que a pessoa está acessando o site (não precisa escolher horário — é sempre terça e quinta às 21h).
+
+## Planilha de leads
+
+Cada envio do formulário também é registrado como uma linha nesta planilha:
+https://docs.google.com/spreadsheets/d/1wrPHjjffqze39XmZ2x2HDfGhRRn_q_jvxThu7DmwEAE/edit
+
+Colunas: Data do preenchimento, Nome, E-mail, WhatsApp, Aula agendada para.
+
+## Status atual
+
+- URL do Apps Script já configurada no site (variável `EXP_GAS_URL` em `index.html`).
+- Se o link do app da Web mudar no futuro (por exemplo, se for feita uma implantação nova em vez de atualizar a existente), é preciso atualizar essa variável de novo.
