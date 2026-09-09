@@ -144,8 +144,8 @@ h2{font-size:clamp(1.5rem,3vw,2.4rem);}
 .exp-wrap{max-width:600px;margin:0 auto;text-align:center;}
 .exp-form{background:var(--branco);border-radius:18px;padding:36px 30px;margin-top:32px;box-shadow:0 4px 16px rgba(0,0,0,0.06);text-align:left;}
 .exp-form label{display:block;font-size:0.85rem;font-weight:700;color:var(--verde-escuro);margin-bottom:6px;}
-.exp-form input{width:100%;padding:12px 14px;border:2px solid rgba(74,103,65,0.15);border-radius:10px;font-family:'Lato',sans-serif;font-size:0.95rem;margin-bottom:18px;color:var(--texto);}
-.exp-form input:focus{outline:none;border-color:var(--dourado-escuro);}
+.exp-form input,.exp-form select{width:100%;padding:12px 14px;border:2px solid rgba(74,103,65,0.15);border-radius:10px;font-family:'Lato',sans-serif;font-size:0.95rem;margin-bottom:18px;color:var(--texto);background:var(--branco);}
+.exp-form input:focus,.exp-form select:focus{outline:none;border-color:var(--dourado-escuro);}
 .exp-form .btn{width:100%;}
 .exp-note{font-size:0.8rem;color:var(--texto-sec);margin-top:14px;text-align:center;}
 .exp-msg{display:none;padding:14px;border-radius:10px;margin-top:16px;font-size:0.9rem;text-align:center;}
@@ -504,7 +504,8 @@ h2{font-size:clamp(1.5rem,3vw,2.4rem);}
     <h2 style="color:var(--verde-escuro);">Quer fazer a sua aula experimental?</h2>
     <p style="font-size:1rem;color:var(--texto-sec);margin-top:12px;">Agende no formulário abaixo. As aulas experimentais gratuitas acontecem sempre <strong>às terças e quintas, às 21h</strong>, ao vivo, pelo Google Meet.</p>
     <form class="exp-form" id="form-experimental">
-      <label for="exp-data">Escolha o dia da sua aula experimental</label>
+      <p id="exp-proxima-aula" style="background:rgba(122,158,114,0.15);color:var(--verde-escuro);font-weight:700;padding:12px 14px;border-radius:10px;margin-bottom:22px;text-align:center;font-size:0.95rem;"></p>
+      <label for="exp-data">Prefere outro dia? Escolha nas próximas semanas</label>
       <select id="exp-data" name="dataAula" required></select>
       <label for="exp-nome">Nome</label>
       <input type="text" id="exp-nome" name="nome" required placeholder="Seu nome completo">
@@ -813,24 +814,37 @@ function closeMenu(){document.getElementById('navMob').classList.remove('open');
 // AULA EXPERIMENTAL
 var EXP_GAS_URL = "https://script.google.com/macros/s/AKfycbxmsTQ9K95Dy8MBuiVoaEgWgYqnwum1-2F-VZDjq_BGK-3F_-GGHtf7XzSkGhkXFuyN/exec";
 var EXP_MEET_LINK = "http://meet.google.com/rcf-dbkf-bqz";
-function proximaAulaExperimental(){
+function proximasAulasExperimentais(){
   var now = new Date();
-  for(var add=0; add<15; add++){
+  var datas = [];
+  for(var add=0; add<32; add++){
     var d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+add, 21, 0, 0, 0);
-    if((d.getDay()===2 || d.getDay()===4) && d.getTime() > now.getTime()){ return d; }
+    if((d.getDay()===2 || d.getDay()===4) && d.getTime() > now.getTime()){ datas.push(d); }
   }
-  return null;
+  return datas;
+}
+function formatarDataAula(d){
+  var fmt = d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  return fmt.charAt(0).toUpperCase()+fmt.slice(1) + ', às 21h';
+}
+function preencherOpcoesAula(){
+  var infoEl = document.getElementById('exp-proxima-aula');
+  var selectEl = document.getElementById('exp-data');
+  if(!selectEl) return;
+  var datas = proximasAulasExperimentais();
+  selectEl.innerHTML = '';
+  datas.forEach(function(d, i){
+    var opt = document.createElement('option');
+    opt.value = d.toISOString();
+    opt.textContent = formatarDataAula(d);
+    selectEl.appendChild(opt);
+  });
+  if(infoEl && datas.length){
+    infoEl.textContent = 'Sua próxima aula experimental disponível: ' + formatarDataAula(datas[0]);
+  }
 }
 (function(){
-  var infoEl = document.getElementById('exp-proxima-aula');
-  var dataInput = document.getElementById('exp-data');
-  var prox = proximaAulaExperimental();
-  if(infoEl && dataInput && prox){
-    dataInput.value = prox.toISOString();
-    var fmt = prox.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-    fmt = fmt.charAt(0).toUpperCase()+fmt.slice(1);
-    infoEl.textContent = 'Sua próxima aula experimental disponível: ' + fmt + ', às 21h';
-  }
+  preencherOpcoesAula();
   var form = document.getElementById('form-experimental');
   if(form){
     form.addEventListener('submit', function(ev){
@@ -845,7 +859,7 @@ function proximaAulaExperimental(){
       }
       var body = new URLSearchParams(new FormData(form));
       fetch(EXP_GAS_URL, { method:'POST', body: body, mode:'no-cors' })
-        .then(function(){ okMsg.style.display='block'; form.reset(); var p=proximaAulaExperimental(); if(p) dataInput.value=p.toISOString(); })
+        .then(function(){ okMsg.style.display='block'; form.reset(); preencherOpcoesAula(); })
         .catch(function(){ errMsg.style.display='block'; });
     });
   }
