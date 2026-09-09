@@ -13,33 +13,16 @@ function doPost(e) {
   var fim = new Date(inicio.getTime() + 60 * 60 * 1000);
   var dataFormatada = Utilities.formatDate(inicio, "GMT-03:00", "dd/MM/yyyy 'às' HH'h'mm");
 
-  var eventId = null;
   try {
-    var calendario = CalendarApp.getDefaultCalendar();
-    var evento = calendario.createEvent("Aula Experimental de Yoga - " + nome, inicio, fim, {
-      description:
-        "Aula experimental gratuita de yoga.\n" +
-        "Aluna: " + nome + "\n" +
-        "WhatsApp: " + whatsapp + "\n" +
-        "Link da aula (Google Meet): " + MEET_LINK,
-      guests: email,
-      sendInvites: true
-    });
-    eventId = evento.getId().split("@")[0];
+    criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim);
   } catch (err) {
     Logger.log("Erro ao criar evento na agenda: " + err);
   }
 
-  if (eventId) {
-    try {
-      removerMeetAutomatico(eventId);
-    } catch (err) {
-      Logger.log("Erro ao remover Meet automático do evento: " + err);
-    }
-  }
-
+  var planilhaOk = false;
   try {
     registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada);
+    planilhaOk = true;
   } catch (err) {
     Logger.log("Erro ao registrar lead na planilha: " + err);
   }
@@ -53,7 +36,7 @@ function doPost(e) {
         "Sua aula experimental gratuita de yoga com a Amanda Moraes está agendada para " + dataFormatada + ".\n\n" +
         "Link da aula (Google Meet): " + MEET_LINK + "\n\n" +
         "Você também recebeu um convite na sua agenda do Google, para não esquecer.\n\n" +
-        "Nos vemos lá!\nQuerida Gratidão"
+        "Nos vemos lá!\nAmanda - Querida Gratidão"
     });
   } catch (err) {
     Logger.log("Erro ao enviar e-mail para a aluna: " + err);
@@ -69,7 +52,8 @@ function doPost(e) {
         "E-mail: " + email + "\n" +
         "WhatsApp: " + whatsapp + "\n" +
         "Data/horário: " + dataFormatada + "\n\n" +
-        "O evento já foi criado na sua agenda do Google e o lead já está na planilha."
+        "O evento já foi criado na sua agenda do Google.\n" +
+        (planilhaOk ? "O lead já está na planilha." : "ATENÇÃO: não consegui registrar esse lead na planilha automaticamente — veja o log de Execuções no Apps Script.")
     });
   } catch (err) {
     Logger.log("Erro ao enviar e-mail de notificação para Amanda: " + err);
@@ -81,21 +65,59 @@ function doPost(e) {
 }
 
 /**
- * Remove o Meet automático apenas deste evento (a configuração geral
- * da agenda de adicionar Meet automaticamente continua valendo para
- * os outros eventos/reuniões).
+ * Cria o evento em 3 etapas para evitar que o convite enviado à aluna
+ * já saia com o link de Meet gerado automaticamente pela conta do Google:
+ * 1) cria o evento SEM mandar convite ainda;
+ * 2) remove o link de Meet automático desse evento específico
+ *    (a configuração geral da agenda continua igual para outros eventos);
+ * 3) só então envia o convite à convidada, já sem o link duplicado.
  */
-function removerMeetAutomatico(eventId) {
-  var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" +
-    eventId + "?conferenceDataVersion=1&sendUpdates=none";
-  var options = {
+function criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim) {
+  var headers = { Authorization: "Bearer " + ScriptApp.getOAuthToken() };
+  var baseUrl = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+  var descricao =
+    "Aula experimental gratuita de yoga.\n" +
+    "Aluna: " + nome + "\n" +
+    "WhatsApp: " + whatsapp + "\n" +
+    "Link da aula (Google Meet): " + MEET_LINK;
+
+  var payloadCriacao = {
+    summary: "Aula Experimental de Yoga - " + nome,
+    description: descricao,
+    start: { dateTime: inicio.toISOString(), timeZone: "America/Sao_Paulo" },
+    end: { dateTime: fim.toISOString(), timeZone: "America/Sao_Paulo" },
+    attendees: [{ email: email }],
+    conferenceData: null
+  };
+
+  var criar = UrlFetchApp.fetch(baseUrl + "?conferenceDataVersion=1&sendUpdates=none", {
+    method: "post",
+    contentType: "application/json",
+    headers: headers,
+    payload: JSON.stringify(payloadCriacao),
+    muteHttpExceptions: true
+  });
+  var evento = JSON.parse(criar.getContentText());
+  if (!evento.id) {
+    Logger.log("Falha ao criar evento: " + criar.getContentText());
+    return;
+  }
+
+  UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?conferenceDataVersion=1&sendUpdates=none", {
     method: "patch",
     contentType: "application/json",
-    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+    headers: headers,
     payload: JSON.stringify({ conferenceData: null }),
     muteHttpExceptions: true
-  };
-  UrlFetchApp.fetch(url, options);
+  });
+
+  UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?sendUpdates=all", {
+    method: "patch",
+    contentType: "application/json",
+    headers: headers,
+    payload: JSON.stringify({ description: descricao }),
+    muteHttpExceptions: true
+  });
 }
 
 function registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada) {
