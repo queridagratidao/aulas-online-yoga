@@ -504,14 +504,14 @@ h2{font-size:clamp(1.5rem,3vw,2.4rem);}
     <h2 style="color:var(--verde-escuro);">Quer fazer a sua aula experimental?</h2>
     <p style="font-size:1rem;color:var(--texto-sec);margin-top:12px;">Agende no formulário abaixo. As aulas experimentais gratuitas acontecem sempre <strong>às terças e quintas, às 21h</strong>, ao vivo, pelo Google Meet.</p>
     <form class="exp-form" id="form-experimental">
-      <p id="exp-proxima-aula" style="background:rgba(122,158,114,0.15);color:var(--verde-escuro);font-weight:700;padding:12px 14px;border-radius:10px;margin-bottom:22px;text-align:center;font-size:0.95rem;"></p>
+      <label for="exp-data">Escolha o dia da sua aula experimental</label>
+      <select id="exp-data" name="dataAula" required></select>
       <label for="exp-nome">Nome</label>
       <input type="text" id="exp-nome" name="nome" required placeholder="Seu nome completo">
       <label for="exp-email">E-mail</label>
       <input type="email" id="exp-email" name="email" required placeholder="seu@email.com">
       <label for="exp-whats">WhatsApp (com DDD)</label>
       <input type="tel" id="exp-whats" name="whatsapp" required placeholder="(11) 91234-5678">
-      <input type="hidden" id="exp-data" name="dataAula">
       <button type="submit" class="btn btn-d">Quero agendar minha aula experimental</button>
       <div class="exp-msg ok" id="exp-msg-ok">Prontinho! Você vai receber um e-mail com a confirmação e o link da aula. 🌿</div>
       <div class="exp-msg err" id="exp-msg-err">Não foi possível enviar agora. Tente novamente ou fale com a gente pelo WhatsApp.</div>
