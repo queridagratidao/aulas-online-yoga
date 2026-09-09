@@ -13,19 +13,21 @@ function doPost(e) {
   var fim = new Date(inicio.getTime() + 60 * 60 * 1000);
   var dataFormatada = Utilities.formatDate(inicio, "GMT-03:00", "dd/MM/yyyy 'às' HH'h'mm");
 
+  var erroAgenda = "";
   try {
-    criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim);
+    erroAgenda = criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim);
   } catch (err) {
-    Logger.log("Erro ao criar evento na agenda: " + err);
+    erroAgenda = String(err);
   }
+  if (erroAgenda) Logger.log("Erro ao criar evento na agenda: " + erroAgenda);
 
-  var planilhaOk = false;
+  var erroPlanilha = "";
   try {
     registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada);
-    planilhaOk = true;
   } catch (err) {
-    Logger.log("Erro ao registrar lead na planilha: " + err);
+    erroPlanilha = String(err);
   }
+  if (erroPlanilha) Logger.log("Erro ao registrar lead na planilha: " + erroPlanilha);
 
   try {
     MailApp.sendEmail({
@@ -43,6 +45,10 @@ function doPost(e) {
   }
 
   try {
+    var linhasStatus = [];
+    linhasStatus.push(erroAgenda ? "ATENÇÃO: não consegui criar o evento na agenda. Erro: " + erroAgenda : "O evento já foi criado na sua agenda do Google.");
+    linhasStatus.push(erroPlanilha ? "ATENÇÃO: não consegui registrar esse lead na planilha. Erro: " + erroPlanilha : "O lead já está na planilha.");
+
     MailApp.sendEmail({
       to: EMAIL_AMANDA,
       subject: "Nova aula experimental agendada - " + nome,
@@ -52,8 +58,7 @@ function doPost(e) {
         "E-mail: " + email + "\n" +
         "WhatsApp: " + whatsapp + "\n" +
         "Data/horário: " + dataFormatada + "\n\n" +
-        "O evento já foi criado na sua agenda do Google.\n" +
-        (planilhaOk ? "O lead já está na planilha." : "ATENÇÃO: não consegui registrar esse lead na planilha automaticamente — veja o log de Execuções no Apps Script.")
+        linhasStatus.join("\n")
     });
   } catch (err) {
     Logger.log("Erro ao enviar e-mail de notificação para Amanda: " + err);
@@ -71,8 +76,13 @@ function doPost(e) {
  * 2) remove o link de Meet automático desse evento específico
  *    (a configuração geral da agenda continua igual para outros eventos);
  * 3) só então envia o convite à convidada, já sem o link duplicado.
+ * Retorna uma string vazia se tudo deu certo, ou a mensagem de erro.
  */
 function criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim) {
+  // Garante que o Apps Script solicite a permissão de Agenda (CalendarApp)
+  // além da permissão usada para as chamadas diretas de API abaixo.
+  CalendarApp.getDefaultCalendar();
+
   var headers = { Authorization: "Bearer " + ScriptApp.getOAuthToken() };
   var baseUrl = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
   var descricao =
@@ -97,27 +107,35 @@ function criarEventoSemMeetAutomatico(nome, email, whatsapp, inicio, fim) {
     payload: JSON.stringify(payloadCriacao),
     muteHttpExceptions: true
   });
+  var codigoCriar = criar.getResponseCode();
   var evento = JSON.parse(criar.getContentText());
-  if (!evento.id) {
-    Logger.log("Falha ao criar evento: " + criar.getContentText());
-    return;
+  if (codigoCriar < 200 || codigoCriar >= 300 || !evento.id) {
+    return "criação (HTTP " + codigoCriar + "): " + criar.getContentText();
   }
 
-  UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?conferenceDataVersion=1&sendUpdates=none", {
+  var patch1 = UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?conferenceDataVersion=1&sendUpdates=none", {
     method: "patch",
     contentType: "application/json",
     headers: headers,
     payload: JSON.stringify({ conferenceData: null }),
     muteHttpExceptions: true
   });
+  if (patch1.getResponseCode() >= 300) {
+    Logger.log("Aviso: não consegui remover o Meet automático (HTTP " + patch1.getResponseCode() + "): " + patch1.getContentText());
+  }
 
-  UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?sendUpdates=all", {
+  var patch2 = UrlFetchApp.fetch(baseUrl + "/" + evento.id + "?sendUpdates=all", {
     method: "patch",
     contentType: "application/json",
     headers: headers,
     payload: JSON.stringify({ description: descricao }),
     muteHttpExceptions: true
   });
+  if (patch2.getResponseCode() >= 300) {
+    return "envio do convite (HTTP " + patch2.getResponseCode() + "): " + patch2.getContentText();
+  }
+
+  return "";
 }
 
 function registrarLeadNaPlanilha(nome, email, whatsapp, dataFormatada) {
